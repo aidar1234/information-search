@@ -43,26 +43,28 @@ def lemmatize_tokens(tokens: set[str]) -> dict[str, list[str]]:
 
     return lemma_dict
 
+def process_file(directory, filename):
+    tokens: set[str] = set()
+    file_path = os.path.join(directory, filename)
+    text = extract_text_from_html(file_path)
+    tokens = tokenize_text(text)
 
-def process_html_files(directory: str) -> None:
-    all_tokens: set[str] = set()
+    lemmatized_tokens = lemmatize_tokens(tokens)
 
-    for filename in os.listdir(directory):
-        if filename.endswith(".html"):
-            file_path = os.path.join(directory, filename)
-            text = extract_text_from_html(file_path)
-            tokens = tokenize_text(text)
-            all_tokens.update(tokens)
+    filename = filename.replace(".html", "")
+    with open("result/tokens-" + filename + ".txt", "w", encoding="utf-8") as token_file:
+        token_file.writelines(f"{token}\n" for token in sorted(tokens))
 
-    lemmatized_tokens = lemmatize_tokens(all_tokens)
-
-    with open("result/tokens.txt", "w", encoding="utf-8") as token_file:
-        token_file.writelines(f"{token}\n" for token in sorted(all_tokens))
-
-    with open("result/lemmatized_tokens.txt", "w", encoding="utf-8") as lemma_file:
+    with open("result/lemmas-" + filename + ".txt", "w", encoding="utf-8") as lemma_file:
         for lemma, words in sorted(lemmatized_tokens.items()):
             unique_words = " ".join(sorted(set(words)))
             lemma_file.write(f"{lemma} {unique_words}\n")
+
+
+def process_html_files(directory: str) -> None:
+    for filename in os.listdir(directory):
+        if filename.endswith(".html"):
+            process_file(directory, filename)
 
 
 if __name__ == "__main__":
