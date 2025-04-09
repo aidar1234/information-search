@@ -1,5 +1,6 @@
 import os
 import re
+import json
 
 
 def build_inverted_index(directory):
@@ -7,6 +8,10 @@ def build_inverted_index(directory):
     Построение инвертированного индекса из файлов лемм
     """
     inverted_index = {}
+
+    # Создание директории для индекса, если она не существует
+    os.makedirs("index", exist_ok=True)
+
     for filename in os.listdir(directory):
         if filename.startswith("lemmas-") and filename.endswith(".txt"):
             doc_id = filename.replace("lemmas-", "").replace(".txt", "")
@@ -24,7 +29,31 @@ def build_inverted_index(directory):
                                 inverted_index[token] = set()
                             inverted_index[token].add(doc_id)
 
+    # Сохранение индекса в JSON-файл
+    with open("index/inverted_index.json", "w", encoding="utf-8") as f:
+        # Преобразуем множества в списки для сериализации
+        serializable_index = {k: list(v) for k, v in inverted_index.items()}
+        json.dump(serializable_index, f, ensure_ascii=False, indent=2)
+
+    # Сохранение текстовой версии индекса
+    with open("index/inverted_index.txt", "w", encoding="utf-8") as f:
+        for token, docs in sorted(inverted_index.items()):
+            f.write(f"{token}: {' '.join(sorted(docs))}\n")
+
     return inverted_index
+
+
+def load_inverted_index(index_path="index/inverted_index.json"):
+    """
+    Загрузка инвертированного индекса из JSON-файла
+    """
+    try:
+        with open(index_path, "r", encoding="utf-8") as f:
+            loaded_index = json.load(f)
+        # Преобразуем списки обратно во множества
+        return {k: set(v) for k, v in loaded_index.items()}
+    except FileNotFoundError:
+        return {}
 
 
 def parse_query(query):
@@ -108,7 +137,9 @@ def search(query, inverted_index):
 lemmas_dir = "../home work 2/result"
 
 # Построение инвертированного индекса
-inverted_index = build_inverted_index(lemmas_dir)
+inverted_index = load_inverted_index()
+if not inverted_index:
+        inverted_index = build_inverted_index(lemmas_dir)
 
 while True:
     query = input("Введите запрос (или 'q' для выхода): ")
