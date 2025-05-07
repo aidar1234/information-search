@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Поиск</title>
+</head>
+<body>
+    <h1>Векторный поиск</h1>
+    <form method="POST" action="/">
+        <label for="query">Введите запрос:</label>
+        <input type="text" name="query" id="query" required>
+        <button type="submit">Искать</button>
+    </form>
+
+    {% if token_results %}
+        <h2>Результаты по токенам:</h2>
+        <ol>
+            {% for url, doc_id, score in token_results %}
+                <li>
+                    Документ {{ doc_id }}:
+                    <a href="{{ url }}" target="_blank">{{ url }}</a>,
+                    Близость = {{ score|round(4) }}
+                </li>
+            {% endfor %}
+        </ol>
+    {% endif %}
+
+    {% if lemma_results %}
+        <h2>Результаты по леммам:</h2>
+        <ol>
+            {% for url, doc_id, score in lemma_results %}
+                <li>
+                    Документ {{ doc_id }}:
+                    <a href="{{ url }}" target="_blank">{{ url }}</a>,
+                    Близость = {{ score|round(4) }}
+                </li>
+            {% endfor %}
+        </ol>
+    {% endif %}
+</body>
+</html>
+

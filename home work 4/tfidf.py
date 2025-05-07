@@ -1,81 +1,44 @@
 import os
 import math
 from collections import defaultdict, Counter
+import re
+import nltk
+import pymorphy3
+from bs4 import BeautifulSoup
+from nltk.corpus import stopwords
 
 NUM_DOCS = 100
 HW_2_DIR = "./../home work 2/result"
 OUTPUT_DIR = "result"
 
 os.makedirs(OUTPUT_DIR, exist_ok=True)
+stop_words = set(stopwords.words("russian"))
+morph = pymorphy3.MorphAnalyzer()
 
-# # --- Сбор TF и DF данных ---
-# token_docs = []
-# lemma_docs = []
-#
-# token_df = defaultdict(int)
-# lemma_df = defaultdict(int)
-#
-# for i in range(1, NUM_DOCS + 1):
-#     # Читаем токены
-#     with open(os.path.abspath(f"{HW_2_DIR}/tokens-{i}.txt"), encoding="utf-8") as f:
-#         tokens = f.read().splitlines()
-#     token_counts = Counter(tokens)
-#     token_docs.append((token_counts, len(tokens)))
-#
-#     for token in set(tokens):
-#         token_df[token] += 1
-#
-#     # Читаем леммы
-#     lemma_map = defaultdict(list)
-#     with open(os.path.abspath(f"{HW_2_DIR}/lemmas-{i}.txt"), encoding="utf-8") as f:
-#         for line in f:
-#             parts = line.strip().split()
-#             if not parts:
-#                 continue
-#             lemma, *lemma_tokens = parts
-#             lemma_map[lemma].extend(lemma_tokens)
-#
-#     lemma_counts = {}
-#     total_tokens = 0
-#     for lemma, tokens in lemma_map.items():
-#         count = len(tokens)
-#         lemma_counts[lemma] = count
-#         total_tokens += count
-#
-#     lemma_docs.append((lemma_counts, total_tokens))
-#
-#     for lemma in lemma_counts.keys():
-#         lemma_df[lemma] += 1
-#
-#
-# # --- IDF ---
-# # def compute_idf(df_dict):
-# #     return {term: math.log(NUM_DOCS / (1 + df)) for term, df in df_dict.items()}
-#
-#
-# token_idf = compute_idf(token_df)
-# lemma_idf = compute_idf(lemma_df)
-#
-# # --- Запись TF-IDF по токенам ---
-# for i, (token_counts, total_tokens) in enumerate(token_docs):
-#     path = f"{OUTPUT_DIR}/tfidf-tokens-{i}.txt"
-#     with open(path, "w", encoding="utf-8") as f:
-#         for token, count in token_counts.items():
-#             tf = count / total_tokens
-#             idf = token_idf[token]
-#             tfidf = tf * idf
-#             f.write(f"{token} {idf:.6f} {tfidf:.6f}\n")
-#
-# # --- Запись TF-IDF по леммам ---
-# for i, (lemma_counts, total_tokens) in enumerate(lemma_docs):
-#     path = f"{OUTPUT_DIR}/tfidf-lemmas-{i}.txt"
-#     with open(path, "w", encoding="utf-8") as f:
-#         for lemma, count in lemma_counts.items():
-#             tf = count / total_tokens
-#             idf = lemma_idf[lemma]
-#             tfidf = tf * idf
-#             f.write(f"{lemma} {idf:.6f} {tfidf:.6f}\n")
+def load_all_docs_words() -> list[list[str]]:
+    all_docs_words = list()
+    for i in range(1, 101):
+        doc_words = load_all_words(f"{i}.html")
+        all_docs_words.append(doc_words)
+    return all_docs_words
 
+def load_all_words(filename) -> list[str]:
+    file_path = os.path.join("../home work 1/pages", filename)
+    with open(file_path, "r", encoding="utf-8") as file:
+        soup = BeautifulSoup(file, "html.parser")
+        text = soup.get_text()
+        tokens = nltk.word_tokenize(text, language="russian")
+        filtered_tokens = list()
+
+        for token in tokens:
+            token = token.lower()
+            if token in stop_words:
+                continue
+            if not re.fullmatch(r'[а-яА-ЯёЁ]+', token):
+                continue
+            filtered_tokens.append(token)
+
+        return filtered_tokens
 
 def load_docs_tokens() -> list[list[str]]:
     docs_tokens = list()
@@ -85,15 +48,36 @@ def load_docs_tokens() -> list[list[str]]:
             docs_tokens.append(tokens)
     return docs_tokens
 
-def compute_docs_tokens_tfs(docs_tokens) -> list[dict[str, float]]:
+def compute_docs_tokens_tfs(docs_tokens, docs_all_words) -> list[dict[str, float]]:
     docs_tokens_tfs = list()
-    for doc_tokens in docs_tokens:
+    for i in range(0, 100):
+        doc_tokens = docs_tokens[i]
+        doc_all_words = docs_all_words[i]
+
         tokens_tfs = dict()
-        tokens_counts = Counter(doc_tokens)
-        for doc_token, token_count in tokens_counts.items():
-            tokens_tfs[doc_token] = token_count / len(doc_tokens)
+        tokens_counts = Counter(doc_all_words)
+        for doc_token in doc_tokens:
+            tokens_tfs[doc_token] = tokens_counts[doc_token] / len(doc_all_words)
         docs_tokens_tfs.append(tokens_tfs)
     return docs_tokens_tfs
+
+def compute_docs_lemmas_tfs(docs_lemmas, docs_all_words) -> list[dict[str, float]]:
+    docs_lemmas_tfs = list()
+    for i in range(0, 100):
+        doc_lemmas = docs_lemmas[i]
+        doc_all_words = docs_all_words[i]
+
+        lemmatized_worlds = list()
+        for word in doc_all_words:
+            lemma = morph.parse(word)[0].normal_form
+            lemmatized_worlds.append(lemma)
+        lemmas_counts = Counter(lemmatized_worlds)
+
+        lemmas_tfs = dict()
+        for doc_lemma in doc_lemmas:
+            lemmas_tfs[doc_lemma] = lemmas_counts[doc_lemma] / len(lemmatized_worlds)
+        docs_lemmas_tfs.append(lemmas_tfs)
+    return docs_lemmas_tfs
 
 
 def compute_docs_tokens_idfs(docs_tokens) -> list[dict[str, float]]:
@@ -116,10 +100,7 @@ def compute_docs_tokens_idfs(docs_tokens) -> list[dict[str, float]]:
     return docs_tokens_idfs
 
 
-def compute_tfidf_for_docs_tokens(docs_tokens) -> list[dict[str, (float, float)]]:
-    docs_tokens_tfs = compute_docs_tokens_tfs(docs_tokens) # doc -> token -> tf
-    docs_tokens_idfs = compute_docs_tokens_idfs(docs_tokens) # doc -> token -> idf
-
+def merge_tf_idf(docs_tokens_tfs, docs_tokens_idfs):
     docs_tokens_tfidfs = list()
     for i in range(0, 100):
         map = dict()
@@ -132,10 +113,17 @@ def compute_tfidf_for_docs_tokens(docs_tokens) -> list[dict[str, (float, float)]
     return docs_tokens_tfidfs
 
 
-def print_tfidf(tokens_tfidfs, type):
+def compute_tfidf_for_docs_tokens(docs_tokens, docs_all_words) -> list[dict[str, (float, float)]]:
+    docs_tokens_tfs = compute_docs_tokens_tfs(docs_tokens, docs_all_words) # doc -> token -> tf
+    docs_tokens_idfs = compute_docs_tokens_idfs(docs_tokens) # doc -> token -> idf
+
+    return merge_tf_idf(docs_tokens_tfs, docs_tokens_idfs)
+
+
+def print_tfidf(tokens_tfidfs, doc_type):
     for i in range(1, 101):
         doc_tokens_tfidfs = tokens_tfidfs[i-1]
-        path = f"{OUTPUT_DIR}/tfidf-{type}-{i}.txt"
+        path = f"{OUTPUT_DIR}/tfidf-{doc_type}-{i}.txt"
         with open(os.path.abspath(path), "w", encoding="utf-8") as f:
             for token, tfidfs in doc_tokens_tfidfs.items():
                 f.write(f"{token} {tfidfs[0]:.6f} {tfidfs[1]:.6f}\n")
@@ -148,43 +136,46 @@ def load_docs_lemmas() -> list[list[str]]:
             tokens = f.read().splitlines()
             docs_lemma_strings.append(tokens)
     docs_lemmas = list()
-    for lemmas in docs_lemma_strings:
-        splitted_lemmas = list()
-        for lemma in lemmas:
-            splitted = lemma.split(" ")
-            splitted_lemmas.append(splitted)
-        docs_lemmas.append(splitted_lemmas)
+    for doc_lemma_strings in docs_lemma_strings:
+        doc_lemmas = list()
+        for lemma_string in doc_lemma_strings:
+            split_lemma_string = lemma_string.split(" ")
+            doc_lemmas.append(split_lemma_string[0])
+        docs_lemmas.append(doc_lemmas)
     return docs_lemmas
 
 
 def build_token_to_lemma_map(docs_lemmas):
-    map = dict()
+    token_to_lemma_map = dict()
     for doc_lemmas in docs_lemmas:
         for lemma in doc_lemmas:
             for i in range(1, len(lemma)):
-                map[lemma[i]] = lemma[0]
-    return map
+                token_to_lemma_map[lemma[i]] = lemma[0]
+    return token_to_lemma_map
 
 
-def replace_tokens_by_lemmas(docs_tokens, map) -> list[list[str]]:
+def replace_tokens_by_lemmas(docs_tokens) -> list[set[str]]:
     replaced = list()
     for doc_tokens in docs_tokens:
-        replaced_tokens = list()
+        replaced_tokens = set()
         for token in doc_tokens:
-            replaced_tokens.append(map[token])
+            lemma = morph.parse(token)[0].normal_form
+            replaced_tokens.add(lemma)
         replaced.append(replaced_tokens)
     return replaced
 
-def compute_tfidf_for_docs_lemmas(docs_tokens) -> list[dict[str, (float, float)]]:
+def compute_tfidf_for_docs_lemmas(docs_tokens, docs_all_words) -> list[dict[str, (float, float)]]:
     docs_lemmas = load_docs_lemmas()
-    map = build_token_to_lemma_map(docs_lemmas)
-    docs_tokens = replace_tokens_by_lemmas(docs_tokens, map)
-    return compute_tfidf_for_docs_tokens(docs_tokens)
+    docs_tokens_tfs = compute_docs_lemmas_tfs(docs_lemmas, docs_all_words) # doc -> token -> tf
+    docs_tokens_idfs = compute_docs_tokens_idfs(docs_lemmas) # doc -> token -> idf
+
+    return merge_tf_idf(docs_tokens_tfs, docs_tokens_idfs)
 
 def main():
     docs_tokens = load_docs_tokens()
-    docs_tokens_tfidf = compute_tfidf_for_docs_tokens(docs_tokens)
-    docs_lemmas_tfidf = compute_tfidf_for_docs_lemmas(docs_tokens)
+    docs_all_words = load_all_docs_words()
+    docs_tokens_tfidf = compute_tfidf_for_docs_tokens(docs_tokens, docs_all_words)
+    docs_lemmas_tfidf = compute_tfidf_for_docs_lemmas(docs_tokens, docs_all_words)
     print_tfidf(docs_tokens_tfidf, 'tokens')
     print_tfidf(docs_lemmas_tfidf, 'lemmas')
 

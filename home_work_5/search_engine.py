@@ -2,11 +2,11 @@ import os
 import math
 import json
 from typing import Dict, List, Tuple
+
 import pymorphy3
 import nltk
 from nltk.corpus import stopwords
 import re
-
 
 class VectorSearchEngine:
     def __init__(self, tfidf_dir: str, index_path: str):
@@ -161,9 +161,12 @@ class VectorSearchEngine:
             else:
                 # Ищем все формы леммы в инвертированном индексе
                 for form, doc_list in self.inverted_index.items():
-                    if form.startswith(lemma):
+                    lemmatized = self.morph.parse(form)[0].normal_form
+                    if lemmatized == lemma:
                         query_vector[form] = count / max_count
 
+
+        print(f"tokens: {token_counts}, max_count: {max_count}, query_vector: {query_vector}")
         return query_vector
 
     def search(self, query: str, top_k: int = 100, use_lemmas: bool = False) -> List[Tuple[str, int, float]]:
